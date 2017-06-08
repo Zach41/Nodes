@@ -119,3 +119,76 @@ void thread_b() {
     std::lock_guard<hierachical_mutex> lk(other_mutex);
     other_stuff();          // will throw an exception
 }
+
+## once_flag & call_once
+`call_once`可以保证某一段代码在多线程环境下只被执行一次，这对只读对象在多线程环境下的初始化非常有帮助。值得注意的是，如果`call_once`的可调用对象在执行过程中抛出了异常，那么再次调用`call_once`可以再次执行其调用对象，而当成功执行过一次之后，`call_once`就不会再去调用其可调用对象了。一个简单的例子：
+
+```C++
+#include <iostream>
+#include <thread>
+#include <mutex>
+ 
+std::once_flag flag1, flag2;
+ 
+void simple_do_once()
+{
+    std::call_once(flag1, [](){ std::cout << "Simple example: called once\n"; });
+}
+ 
+void may_throw_function(bool do_throw)
+{
+  if (do_throw) {
+    std::cout << "throw: call_once will retry\n"; // this may appear more than once
+    throw std::exception();
+  }
+  std::cout << "Didn't throw, call_once will not attempt again\n"; // guaranteed once
+}
+ 
+void do_once(bool do_throw)
+{
+  try {
+    std::call_once(flag2, may_throw_function, do_throw);
+  }
+  catch (...) {
+  }
+}
+ 
+int main()
+{
+    std::thread st1(simple_do_once);
+    std::thread st2(simple_do_once);
+    std::thread st3(simple_do_once);
+    std::thread st4(simple_do_once);
+    st1.join();
+    st2.join();
+    st3.join();
+    st4.join();
+ 
+    std::thread t1(do_once, true);
+    std::thread t2(do_once, true);
+    std::thread t3(do_once, false);
+    std::thread t4(do_once, true);
+    t1.join();
+    t2.join();
+    t3.join();
+    t4.join();
+}
+```
+
+```
+Output:
+Simple example: called once
+throw: call_once will retry
+throw: call_once will retry
+Didn't throw, call_once will not attempt again
+```
+
+另外，在Ｃ++11标准下，函数内的局部静态变量保证只初始化一次，即
+```C++
+class demo_class;
+demo_class& get_demo() {
+    static demo_class instance;
+    return instance;
+}
+```
+在多线程环境下，`instance`对象保证只被初始化一次。
