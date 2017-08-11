@@ -134,6 +134,9 @@ struct AB: public A, public B {
       std::cout <<"AB B" << std::endl;
   }    
 };
+```
+
+打印虚函数表：
 
 ```
 vtable for 'AB' @ 0x400e40 (subobject @ 0x7fffffffe1b0):
